@@ -186,11 +186,11 @@ Arduino와 ESP32를 활용한 RC카 기반 스마트 주행 보조 시스템입�
 
 | Repository | Description |
 | --- | --- |
-| [TCP-Group-Chat](https://github.com/HanSuChang/TCP-Group-Chat) | Python TCP socket 기반 그룹 채팅 프로젝트 |
-| [ROS2-QoS-Camera-Study](https://github.com/HanSuChang/ROS2-QoS-Camera-Study) | ROS2 QoS와 카메라 토픽 송수신 학습 |
-| [ros_lidar_project](https://github.com/HanSuChang/ros_lidar_project) | ROS2 LiDAR 데이터 활용 프로젝트 |
-| [python-opencv-study](https://github.com/HanSuChang/python-opencv-study) | Python OpenCV 실습 및 영상 처리 학습 |
-| [Daejeon-2025-Weather-Data-Analysis](https://github.com/HanSuChang/Daejeon-2025-Weather-Data-Analysis) | 대전 지역 날씨 데이터 분석 프로젝트 |
+| [Mignonbrothers/smart_car_ws](https://github.com/Mignonbrothers/smart_car_ws) | ROS2 기반 사람 추종 주행, 장애물 회피, 상품 인식 스마트 카트 프로젝트 |
+| [Daejeon-2025-Weather-Data-Analysis](https://github.com/HanSuChang/Daejeon-2025-Weather-Data-Analysis) | 대전 지역 2025년 날씨 데이터 분석 프로젝트 |
+| [pygame-SPACE-DASH-GAME](https://github.com/HanSuChang/pygame-SPACE-DASH-GAME) | Python Pygame 기반 우주 회피 게임 프로젝트 |
+| [Mignonbrothers/BootCamp_Project1](https://github.com/Mignonbrothers/BootCamp_Project1) | Arduino, ESP32, PyQt5 기반 RC카 ADAS 프로젝트 |
+| [yeojin75/hospital_chatbot_project-](https://github.com/yeojin75/hospital_chatbot_project-) | React Native와 FastAPI 기반 병원 추천 챗봇 프로젝트 |
 
 ## What I Focus On
 
