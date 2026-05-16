@@ -21,13 +21,21 @@ Robotics, ROS2, Python, C++ 기반으로 실제 장비와 소프트웨어를 연
 ![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-A22846?style=flat-square&logo=raspberrypi&logoColor=white)
 ![Arduino](https://img.shields.io/badge/Arduino-00979D?style=flat-square&logo=arduino&logoColor=white)
 ![ESP32](https://img.shields.io/badge/ESP32-MCU-333333?style=flat-square)
-![LiDAR](https://img.shields.io/badge/LiDAR-Sensor-444444?style=flat-square)
+![LiDAR](https://img.shields.io/badge/LiDAR-LDS--02-444444?style=flat-square)
+![Nav2](https://img.shields.io/badge/Nav2-Navigation-2C7BE5?style=flat-square)
+
+### AI & Computer Vision
+
+![YOLOv8](https://img.shields.io/badge/YOLOv8-Pose-00C7B7?style=flat-square)
+![Ultralytics](https://img.shields.io/badge/Ultralytics-111111?style=flat-square)
+![BoT-SORT](https://img.shields.io/badge/BoT--SORT-Tracking-6E40C9?style=flat-square)
+![OpenCV](https://img.shields.io/badge/OpenCV-5C3EE8?style=flat-square&logo=opencv&logoColor=white)
+![soynlp](https://img.shields.io/badge/soynlp-Korean%20NLP-2D9CDB?style=flat-square)
 
 ### Languages & Frameworks
 
 ![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
 ![C++](https://img.shields.io/badge/C%2B%2B-00599C?style=flat-square&logo=cplusplus&logoColor=white)
-![OpenCV](https://img.shields.io/badge/OpenCV-5C3EE8?style=flat-square&logo=opencv&logoColor=white)
 ![PyQt5](https://img.shields.io/badge/PyQt5-41CD52?style=flat-square&logo=qt&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-000000?style=flat-square&logo=flask&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
@@ -38,167 +46,180 @@ Robotics, ROS2, Python, C++ 기반으로 실제 장비와 소프트웨어를 연
 ### Tools
 
 ![Git](https://img.shields.io/badge/Git-F05032?style=flat-square&logo=git&logoColor=white)
-![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat-square&logo=ubuntu&logoColor=white)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04-E95420?style=flat-square&logo=ubuntu&logoColor=white)
+![WSL2](https://img.shields.io/badge/WSL2-Windows-0078D4?style=flat-square)
 ![RViz](https://img.shields.io/badge/RViz-Visualization-555555?style=flat-square)
 ![Gazebo](https://img.shields.io/badge/Gazebo-Simulation-7A7A7A?style=flat-square)
+![VS Code](https://img.shields.io/badge/VS%20Code-007ACC?style=flat-square&logo=visualstudiocode&logoColor=white)
+
+---
 
 ## Featured Projects
 
-### Smart Car ROS2 Project - `smart_car_ws-main`
+### 1. Smart Car ROS2 Project - `smart_car_ws`
 
-ROS2 기반 스마트 카트/스마트카 프로젝트입니다. TurtleBot3, Raspberry Pi, Ubuntu PC, 팬틸트 카메라, LiDAR, YOLO Pose, Flask 장바구니 UI를 연결해 사람 추종 주행과 장애물 회피, 상품 인식 기반 자동 장바구니 기능을 구현했습니다.
+ROS2 Humble 기반 스마트 카트 시스템입니다. TurtleBot3, Raspberry Pi 4, Ubuntu PC, ESP32 팬틸트 서보, LiDAR, YOLOv8 Pose, Flask 장바구니 UI를 하나의 워크스페이스에서 연동했습니다.
+
+**구성 패키지**
+
+| Package | Language | 주요 역할 |
+| --- | --- | --- |
+| `smart_car_cpp_pkg` | C++17 | 사람 추종 주행, LiDAR 기반 장애물 회피, Kalman 필터, Nav2 `NavigateToPose` 액션 클라이언트 |
+| `smart_car_py_pkg` | Python 3 | YOLOv8 Pose 추적, 팬틸트 제어, 상품 인식, Flask 장바구니, ESP32 UDP 브리지 |
 
 **핵심 기능**
 
-- ROS2 Humble 기반 `smart_car_cpp_pkg`, `smart_car_py_pkg` 패키지 구성
-- YOLOv8n Pose + BoT-SORT 기반 사람 인식 및 추적
-- 50초 Master Learning으로 추종 대상의 HSV 히스토그램 학습
-- 팬틸트 서보가 사람을 프레임 중앙에 유지하도록 `/servo_pan_cmd`, `/servo_tilt_cmd` 발행
-- 팬틸트 각도(`/pan_tilt/pan_angle`)와 LiDAR(`/scan`)를 이용한 TurtleBot3 사람 추종 주행
-- YOLO Pose keypoint와 LiDAR를 결합한 장애물 의심/회피 상태 머신 구현
-- 장애물 회피 시작 시 `/obstacle_avoidance_trigger` 발행
-- YOLO 상품 인식 결과를 Flask 장바구니 API로 전달하는 자동 장바구니 기능
-- QR 결제 화면, 영수증, 수량 수동 조절을 포함한 Flask 기반 장바구니 UI
+사람 추종은 `pan_tilt_ros2.py`에서 카메라 프레임을 받아 YOLOv8 Pose와 BoT-SORT로 사람을 추적하고, 50초간 Master Learning을 거쳐 추종 대상의 HSV 히스토그램을 학습합니다. 학습 이후에는 히스토그램 Re-ID로 같은 사람을 구분하며, 상체/무릎/발목 keypoint visibility 조합으로 장애물 의심 상황을 판단합니다.
 
-**사람 추종 및 장애물 회피 흐름**
+`person_follower.cpp`는 `/person_detection`, `/pan_tilt/pan_angle`, `/scan`을 결합해 `/cmd_vel`을 생성합니다. 상태 머신은 `PERSON_FOLLOW -> AVOID_TURN -> AVOID_FORWARD -> PERSON_FOLLOW` 흐름이며, 추종 거리, 회피 트리거 거리, 전방 안전거리, 회전 속도 등은 `person_follower.yaml`에서 관리하고 실행 중 파라미터 업데이트가 가능하도록 구성했습니다.
+
+상품 인식은 `ros2_cart_bridge.py`가 YOLO로 선크림, 테이프, 가위, 물티슈 클래스를 검출해 클래스별 cooldown을 적용한 뒤 Flask `/api/add_item`을 호출합니다. `cart_gui.py`의 `CartManager`는 상품명, 가격, 이미지, 수량을 관리하고 QR 결제 페이지, 영수증, 수량 증감, 결제 완료 화면을 제공합니다.
+
+**사람 추종 + 장애물 회피 데이터 흐름**
 
 ```text
-/webcam2/image_raw/compressed
+[PC] /webcam2/image_raw/compressed
   -> pan_tilt_ros2.py
-     - YOLOv8n Pose inference
+     - YOLOv8 Pose inference
      - BoT-SORT tracking
-     - Master Learning 50초
-     - HSV histogram Re-ID
-     - upper/knee/ankle keypoint visibility 판단
-     - /person_detection publish
-     - /pan_tilt/pan_angle publish
-     - /servo_pan_cmd, /servo_tilt_cmd publish
+     - 50s Master Learning + HSV Re-ID
+     - upper/knee/ankle keypoint visibility
+     - /person_detection, /pan_tilt/pan_angle
+     - /servo_pan_cmd, /servo_tilt_cmd
 
-/person_detection + /pan_tilt/pan_angle + /scan
+[Pi4] /person_detection + /pan_tilt/pan_angle + /scan
   -> person_follower.cpp
-     - PERSON_FOLLOW: pan_angle 기준 몸체 정렬 + LiDAR 거리 기반 전진
-     - AVOID_TURN: 발목 미검출 + 전방 LiDAR 근접 시 넓은 방향으로 회전
+     - PERSON_FOLLOW: pan_angle 정렬 + LiDAR 거리 기반 전진
+     - AVOID_TURN: 발목 미검출 + 전방 근접 -> 넓은 쪽 회전
      - AVOID_FORWARD: 전방/대각선 공간 확보 시 저속 전진
-     - pose 복구 + 전방 안전거리 확보 시 PERSON_FOLLOW 복귀
-     - /cmd_vel publish
-     - /obstacle_avoidance_trigger publish
+     - 복귀: pose 회복 + 안전거리 확보 시 PERSON_FOLLOW
+     - /cmd_vel, /obstacle_avoidance_trigger
+
+[ESP32] /servo_pan_cmd, /servo_tilt_cmd
+  -> UDP 8889 -> 팬틸트 서보 PWM
 ```
 
-**장애물 회피 판단**
-
-- 사람이 최근 감지됨
-- 상체 또는 무릎 keypoint는 보임
-- 발목 keypoint는 보이지 않음
-- LiDAR 전방 거리가 `obstacle_suspect_distance_m`보다 가까움
-- 위 조건이 `obstacle_suspect_hold_s` 동안 유지되면 회피 시작
-
-회피 중에는 팬틸트가 계속 사람을 추적하지만, TurtleBot 몸체는 pan angle을 따라가지 않고 LiDAR 기준으로 회피합니다. 좌/우 공간을 비교해 더 넓은 방향으로 회전하고, 전방 또는 대각선 공간이 열리면 저속 전진 후 사람 추종으로 복귀합니다.
-
-**상품 인식 및 장바구니**
+**상품 인식 + Flask 장바구니 흐름**
 
 ```text
 /webcam/image_raw/compressed
   -> ros2_cart_bridge.py
      - YOLO 상품 인식
-     - class_name cooldown 처리
-     - Flask /api/add_item 호출
+     - class_name 정규화 + cooldown
+     - POST http://<gui_host>:5000/api/add_item
 
 cart_gui.py
-  - YOLO class_name을 상품명/가격/이미지로 매핑
-  - 선크림, 테이프, 가위, 물티슈 장바구니 등록
-  - QR 결제 페이지 생성
-  - 수량 증감 및 결제 완료 화면 제공
+  - 선크림 12,000원 / 테이프 1,000원 / 가위 1,000원 / 물티슈 2,000원
+  - 중복 인식 시 자동 수량 증가 차단
+  - 수동 수량 조절
+  - QR 결제 페이지 + 영수증 + 결제 완료 화면
 ```
-
-**구성 패키지**
-
-| Package | Role |
-| --- | --- |
-| `smart_car_py_pkg` | YOLO Pose 추적, 팬틸트 제어, 상품 인식, Flask 장바구니 UI, UDP 서보 브리지 |
-| `smart_car_cpp_pkg` | 사람 추종 주행, LiDAR 기반 장애물 회피, `/cmd_vel` 제어 |
 
 **실행 구조**
 
 ```text
-Ubuntu PC
+[Ubuntu PC]
   - pan_tilt_ros2.py
   - yolo_detect_ros2.py
   - ros2_cart_bridge.py
   - cart_gui.py
 
-Raspberry Pi / TurtleBot3
+[TurtleBot3 + Raspberry Pi 4]
   - person_follower.cpp
+  - go_to_pose.cpp
   - servo_udp_bridge.py
   - scan_summary_monitor.py
   - TurtleBot3 /scan, /cmd_vel 연동
 ```
 
-### BootCamp Project 1 - Arduino Based ADAS
+---
 
-Arduino와 ESP32를 활용한 RC카 기반 스마트 주행 보조 시스템입니다.  
-모바일 Bluetooth 조작, ESP32 센서 제어, Arduino Uno 모터 제어, PyQt5 기반 차량 계기판 GUI를 연동해 수동/자동 주행 흐름을 구현했습니다.
+### 2. BootCamp Project 1 - Arduino Based ADAS
+
+Arduino Uno + ESP32 + PyQt5를 묶은 RC카 기반 ADAS 주행 보조 시스템입니다. 모바일 RoboRemoDemo 앱에서 ESP32로 명령을 보내면, ESP32가 UART로 Arduino Uno 모터 컨트롤러에 명령을 전달하고 WiFi UDP로 PyQt5 GUI에 센서 데이터를 스트리밍합니다.
+
+**통신 토폴로지**
+
+```text
+[Mobile App: RoboRemoDemo]
+  -> Bluetooth Classic
+     -> [ESP32]
+        -> UART Serial2 -> [Arduino Uno + L293D Shield] -> 4ch DC Motor
+        -> Ultrasonic x5 / Photoresistor / RGB LED / Buzzer / TM1637 FND
+        -> WiFi UDP :5005 -> [PyQt5 Cockpit GUI]
+```
 
 **핵심 기능**
 
 - ESP32 Bluetooth Classic 기반 모바일 명령 수신
-- ESP32에서 초음파 센서 5개, 조도 센서, RGB LED, 부저, FND 제어
-- ESP32와 Arduino Uno 간 UART 통신으로 모터 명령 전달
+- 초음파 센서 5개, 조도 센서, RGB LED, 부저, TM1637 FND 제어
 - Arduino Uno + L293D 모터 쉴드 기반 4륜 DC 모터 제어
-- 수동 주행 모드: 가속, 감속, 브레이크, 좌우 조향, 기어 상태 처리
-- 자동 주행 모드: 전방 장애물 감지, 벽 추종, 탱크턴 기반 회피 주행
-- WiFi UDP로 센서 데이터를 PyQt5 GUI에 전송
-- PyQt5 계기판에서 속도, 기어, 배터리, 방향지시등, AUTO/MANUAL 상태 시각화
+- 수동 주행: 가속, 감속, 브레이크, 좌우 조향, 기어 처리
+- 자동 주행: 전방 장애물 감지, 벽 추종, 탱크턴 기반 회피
+- PyQt5 계기판: 속도, 기어, 배터리, 방향지시등, AUTO/MANUAL 상태 표시
 
-### Hospital Chatbot Project - 건강이
+---
 
-고령층을 위한 병원 복지 서비스 자동 추천 챗봇입니다.  
-사용자가 자연어로 증상과 지역을 입력하면 증상 키워드를 분석하고, 공공 병원 데이터와 매칭해 적합한 진료과와 병원을 추천합니다.
+### 3. Hospital Chatbot Project - 건강이
+
+고령층을 위한 병원 추천 챗봇입니다. 사용자가 자연어로 증상과 지역을 입력하면 한국어 NLP로 증상을 정규화하고, 공공 병원 데이터와 진료과 매칭을 거쳐 인근 병원을 추천합니다.
 
 **프로젝트 개요**
 
-- 기간: 2025.05.20 ~ 2025.06.30
-- 참여기관: 동구노인종합복지관
-- 역할: 팀장 / Frontend Lead
-- 담당: 프로젝트 총괄, 챗봇 흐름 설계, API 인터페이스 정의, 프론트엔드와 백엔드 연동
+| 항목 | 내용 |
+| --- | --- |
+| 기간 | 2025.05.20 ~ 2025.06.30 |
+| 참여기관 | 동구노인종합복지관 |
+| 역할 | 팀장 / Frontend Lead |
+| 담당 | 프로젝트 총괄, 챗봇 흐름 설계, API 인터페이스 정의, 프론트엔드-백엔드 연동 |
+
+**아키텍처**
+
+```text
+[React Native + Expo App]
+  -> POST /recommend { message, location }
+     -> [FastAPI Backend]
+        - soynlp LTokenizer 토큰화
+        - synonym_normalized.csv: 증상 유사어 -> 표준 증상
+        - disease_name.csv: 증상 -> 추천 진료과
+        - hospital_data.csv: 영업중 병원 + 진료과 + 주소
+```
 
 **핵심 기능**
 
-- React Native + Expo 기반 모바일 챗봇 UI
-- FastAPI 기반 `/recommend` 병원 추천 API
-- soynlp와 유사어 CSV를 활용한 증상 키워드 정규화
-- 증상-진료과 매핑 테이블 기반 추천 진료과 추론
-- 지역명 기반 병원 데이터 필터링 및 추천 결과 반환
-- 고령층 친화형 큰 글씨 UI, 다크/라이트 모드, TTS 음성 안내
-- 모바일 실기기 테스트를 위한 ngrok 터널링 대응
+백엔드는 FastAPI, pandas, soynlp를 사용해 입력 문장을 토큰화하고 유사어를 표준 증상명으로 매핑합니다. 이후 증상-진료과 매핑 테이블과 병원 데이터를 결합해 지역 기반 병원을 추천합니다.
 
-**성과**
+프론트엔드는 React Native + Expo 기반이며, `home.tsx`와 `chat.tsx`로 홈/채팅 화면을 구성했습니다. 챗봇 응답은 TTS로 읽어주고, 다크/라이트 모드와 큰 글씨 UI를 적용해 고령층 사용성을 높였습니다.
 
-| Metric | Result |
-| --- | --- |
-| Frontend | React Native 화면 2개 구현 |
-| Backend | FastAPI REST 엔드포인트 6개 |
-| Test | 단위/통합 테스트 22건 |
-| Accuracy | 증상-진료과 분류 정확도 88% |
-| Response | 병원 추천 응답 속도 p95 0.5초 |
-| Usability | SUS 84 / 100 |
+---
 
 ## Repository Highlights
 
 | Repository | Description |
 | --- | --- |
-| [Mignonbrothers/smart_car_ws](https://github.com/Mignonbrothers/smart_car_ws) | ROS2 기반 사람 추종 주행, 장애물 회피, 상품 인식 스마트 카트 프로젝트 |
-| [Daejeon-2025-Weather-Data-Analysis](https://github.com/HanSuChang/Daejeon-2025-Weather-Data-Analysis) | 대전 지역 2025년 날씨 데이터 분석 프로젝트 |
-| [pygame-SPACE-DASH-GAME](https://github.com/HanSuChang/pygame-SPACE-DASH-GAME) | Python Pygame 기반 우주 회피 게임 프로젝트 |
-| [Mignonbrothers/BootCamp_Project1](https://github.com/Mignonbrothers/BootCamp_Project1) | Arduino, ESP32, PyQt5 기반 RC카 ADAS 프로젝트 |
-| [yeojin75/hospital_chatbot_project-](https://github.com/yeojin75/hospital_chatbot_project-) | React Native와 FastAPI 기반 병원 추천 챗봇 프로젝트 |
+| [Mignonbrothers/smart_car_ws](https://github.com/Mignonbrothers/smart_car_ws) | TurtleBot3 + YOLOv8 Pose + LiDAR 기반 스마트 카트 |
+| [Daejeon-2025-Weather-Data-Analysis](https://github.com/HanSuChang/Daejeon-2025-Weather-Data-Analysis) | 대전 지역 2025년 날씨 데이터 분석 |
+| [pygame-SPACE-DASH-GAME](https://github.com/HanSuChang/pygame-SPACE-DASH-GAME) | Python Pygame 기반 우주 회피 게임 |
+| [Mignonbrothers/BootCamp_Project1](https://github.com/Mignonbrothers/BootCamp_Project1) | Arduino + ESP32 + PyQt5 RC카 ADAS |
+| [yeojin75/hospital_chatbot_project-](https://github.com/yeojin75/hospital_chatbot_project-) | FastAPI + React Native 병원 추천 챗봇 |
+
+---
 
 ## What I Focus On
 
 - 실제 장비에서 동작하는 ROS2 노드 설계
 - 센서 데이터와 제어 로직을 연결하는 시스템 구성
-- Python/C++을 함께 사용하는 로봇 소프트웨어 개발
+- Python/C++을 함께 사용하는 분산 로봇 소프트웨어 개발
 - 컴퓨터 비전 기반 인식 기능 구현
 - 사용자가 조작하기 쉬운 GUI와 로봇 상태 시각화
+
+## Development Environment
+
+- **로봇**: TurtleBot3 / Raspberry Pi 4 / Arduino Uno / ESP32
+- **OS**: Ubuntu 22.04 / Windows 11 + WSL2
+- **ROS2**: Humble Hawksbill
+- **워크플로**: WSL2 개발 -> GitHub -> 실제 Ubuntu PC / TurtleBot3 배포
+- **튜닝**: `ros2 param set`, `rqt_reconfigure` 기반 실시간 파라미터 조정
 
 ## GitHub Stats
 
