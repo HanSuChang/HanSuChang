@@ -5,7 +5,7 @@ Robotics, ROS2, Python, C++ 기반으로 실제 장비와 소프트웨어를 연
 
 <p>
   <a href="mailto:hsc0724321@gmail.com">
-    <img src="https://img.shields.io/badge/Email-hsc0724321%40gmail.com-EA4335?style=flat-square&logo=gmail&logoColor=white" alt="Email" />
+    <img src="https://img.shields.io/badge/Email-hsc0724321%40gmail.com%20or%20hsc07240%40gmail.com-EA4335?style=flat-square&logo=gmail&logoColor=white" alt="Email" />
   </a>
   <a href="https://github.com/HanSuChang">
     <img src="https://img.shields.io/badge/GitHub-HanSuChang-181717?style=flat-square&logo=github&logoColor=white" alt="GitHub" />
@@ -230,5 +230,5 @@ Arduino Uno + ESP32 + PyQt5를 묶은 RC카 기반 ADAS 주행 보조 시스템�
 
 ## Contact
 
-- Email: `hsc0724321@gmail.com`
+- Email: `hsc0724321@gmail.com` or `hsc07240@gmail.com`
 - GitHub: [github.com/HanSuChang](https://github.com/HanSuChang)
