@@ -284,5 +284,5 @@ Arduino Uno + ESP32 + PyQt5를 묶은 RC카 기반 ADAS 주행 보조 시스템�
 
 ## Contact
 
-- Email: `hsc0724321@gmail.com` or `hsc07240@gmail.com`
+- Email: `hsc0724321@gmail.com` or `hsc07240@naver.com`
 - GitHub: [github.com/HanSuChang](https://github.com/HanSuChang)
