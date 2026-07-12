@@ -23,6 +23,9 @@ Robotics, ROS2, Python, C++ 기반으로 실제 장비와 소프트웨어를 연
 ![ESP32](https://img.shields.io/badge/ESP32-MCU-333333?style=flat-square)
 ![LiDAR](https://img.shields.io/badge/LiDAR-LDS--02-444444?style=flat-square)
 ![Nav2](https://img.shields.io/badge/Nav2-Navigation-2C7BE5?style=flat-square)
+![TF2](https://img.shields.io/badge/TF2-Transform-22314E?style=flat-square)
+![AMCL](https://img.shields.io/badge/AMCL-Localization-444444?style=flat-square)
+![ArUco](https://img.shields.io/badge/ArUco-Marker-5C3EE8?style=flat-square)
 
 ### AI & Computer Vision
 
@@ -56,85 +59,134 @@ Robotics, ROS2, Python, C++ 기반으로 실제 장비와 소프트웨어를 연
 
 ## Featured Projects
 
-### 1. Smart Car ROS2 Project - `smart_car_ws`
+### 1. AMR Logistics Robot ROS2 Project - `Topology_Graph_test`
 
-ROS2 Humble 기반 스마트 카트 시스템입니다. TurtleBot3, Raspberry Pi 4, Ubuntu PC, ESP32 팬틸트 서보, LiDAR, YOLOv8 Pose, Flask 장바구니 UI를 하나의 워크스페이스에서 연동했습니다.
+매니퓰레이터를 탑재한 TurtleBot AMR과 저가형 추종 RC카가 협업하는 ROS2 기반 물류 이송 시스템입니다. React GUI, Go Backend, Python ROS2 Bridge, TurtleBot 주행 시스템, RC카, ArUco 마커, 매니퓰레이터를 하나의 ROS2 DDS 네트워크(`ROS_DOMAIN_ID=27`)로 통합했습니다.
 
-**구성 패키지**
+**담당 역할** — TurtleBot 자율주행 파트 전반(Topology 미션 주행, 계층형 장애물 회피, ArUco 정밀 접근, 충전 L자 도킹, RC카 추종 초기 구현)과 GUI-주행 시스템 통합(SI)
 
-| Package | Language | 주요 역할 |
+**담당 노드 구성**
+
+| Node / File | Language | 주요 역할 |
 | --- | --- | --- |
-| `smart_car_cpp_pkg` | C++17 | 사람 추종 주행, LiDAR 기반 장애물 회피, Kalman 필터, Nav2 `NavigateToPose` 액션 클라이언트 |
-| `smart_car_py_pkg` | Python 3 | YOLOv8 Pose 추적, 팬틸트 제어, 상품 인식, Flask 장바구니, ESP32 UDP 브리지 |
+| `mission_loop.cpp` / `mission2_loop.cpp` | C++ | A/B 구역 Topology 미션 주행, 회피 연계, ArUco 정밀 접근, 충전 L자 도킹 |
+| `local_astar_pure_pursuit.cpp` | C++ | Occupancy Grid + LiDAR 기반 Local A* 경로 생성 및 Pure Pursuit 추종 |
+| `topology_follower.cpp` | C++ | `topology.yaml` 노드 경로 기반 기본 주행 제어 |
+| `rc_car_follower_node.cpp` | C++ | Leader Pose History 기반 RC카 추종주행 (초기 구현·검증) |
+| `aruco_marker_detector_node.cpp` | C++ | ArUco 마커 검출 및 상대 위치/거리 발행 |
+| `topology_marker_node.cpp` | C++ | RViz Topology 노드 시각화 |
 
 **핵심 기능**
 
-사람 추종은 `pan_tilt_ros2.py`에서 카메라 프레임을 받아 YOLOv8 Pose와 BoT-SORT로 사람을 추적하고, 50초간 Master Learning을 거쳐 추종 대상의 HSV 히스토그램을 학습합니다. 학습 이후에는 히스토그램 Re-ID로 같은 사람을 구분하며, 상체/무릎/발목 keypoint visibility 조합으로 장애물 의심 상황을 판단합니다.
+Topology 미션 주행은 `topology.yaml`로 물류 공간을 노드/엣지로 추상화하고, 선택된 작업 구역(A/B)에 따라 `mission_loop` / `mission2_loop`가 목표 노드를 순차 추종합니다. TF `map->base_footprint`로 현재 Pose를 구하고 거리·방향 오차를 이용해 약 20Hz로 `/cmd_vel`을 생성합니다.
 
-`person_follower.cpp`는 `/person_detection`, `/pan_tilt/pan_angle`, `/scan`을 결합해 `/cmd_vel`을 생성합니다. 상태 머신은 `PERSON_FOLLOW -> AVOID_TURN -> AVOID_FORWARD -> PERSON_FOLLOW` 흐름이며, 추종 거리, 회피 트리거 거리, 전방 안전거리, 회전 속도 등은 `person_follower.yaml`에서 관리하고 실행 중 파라미터 업데이트가 가능하도록 구성했습니다.
+장애물 회피는 계층형 구조로 설계했습니다. 평상시에는 Topology 노드로 직접 주행하다가, LiDAR로 장애물이 감지되면 Occupancy Grid(정적)와 LiDAR(동적)를 결합한 Local Planning Grid에서 8방향 `A*`(`f = g + h + alignment_penalty`, Path Corridor 제한)로 우회 경로를 만들고 Pure Pursuit로 추종합니다. Local 회피가 어려운 경우 Corridor Pass로 통로 통과 가능성을 판단한 뒤 Nav2 `FollowPath` + MPPI Controller 기반 Rescue Path로 2차 회피하고, 안전 조건이 확보되면 제어권을 다시 Local/Topology 주행으로 넘깁니다.
 
-상품 인식은 `ros2_cart_bridge.py`가 YOLO로 선크림, 테이프, 가위, 물티슈 클래스를 검출해 클래스별 cooldown을 적용한 뒤 Flask `/api/add_item`을 호출합니다. `cart_gui.py`의 `CartManager`는 상품명, 가격, 이미지, 수량을 관리하고 QR 결제 페이지, 영수증, 수량 증감, 결제 완료 화면을 제공합니다.
+Leader Slot 도착 후에는 Topology 좌표만으로 부족한 수 cm 오차를 ArUco 마커 기반 정밀 접근으로 보정하고, 180° 회전과 7.5cm 후진으로 작업 자세를 맞춘 뒤 `A_mission_start`로 매니퓰레이터 작업을 연계합니다. 충전 미션은 Nav2 `NavigateToPose`로 진입 후 Parking Corner -> 후진 호 -> 직선 후진의 L자형 도킹으로 수행합니다.
 
-**사람 추종 + 장애물 회피 데이터 흐름**
-
-```text
-[PC] /webcam2/image_raw/compressed
-  -> pan_tilt_ros2.py
-     - YOLOv8 Pose inference
-     - BoT-SORT tracking
-     - 50s Master Learning + HSV Re-ID
-     - upper/knee/ankle keypoint visibility
-     - /person_detection, /pan_tilt/pan_angle
-     - /servo_pan_cmd, /servo_tilt_cmd
-
-[Pi4] /person_detection + /pan_tilt/pan_angle + /scan
-  -> person_follower.cpp
-     - PERSON_FOLLOW: pan_angle 정렬 + LiDAR 거리 기반 전진
-     - AVOID_TURN: 발목 미검출 + 전방 근접 -> 넓은 쪽 회전
-     - AVOID_FORWARD: 전방/대각선 공간 확보 시 저속 전진
-     - 복귀: pose 회복 + 안전거리 확보 시 PERSON_FOLLOW
-     - /cmd_vel, /obstacle_avoidance_trigger
-
-[ESP32] /servo_pan_cmd, /servo_tilt_cmd
-  -> UDP 8889 -> 팬틸트 서보 PWM
-```
-
-**상품 인식 + Flask 장바구니 흐름**
+**미션 주행 + 계층형 장애물 회피 흐름**
 
 ```text
-/webcam/image_raw/compressed
-  -> ros2_cart_bridge.py
-     - YOLO 상품 인식
-     - class_name 정규화 + cooldown
-     - POST http://<gui_host>:5000/api/add_item
+[GUI/Backend] 구역 선택 -> /mission_command -> mission_loop / mission2_loop 실행
 
-cart_gui.py
-  - 선크림 12,000원 / 테이프 1,000원 / 가위 1,000원 / 물티슈 2,000원
-  - 중복 인식 시 자동 수량 증가 차단
-  - 수동 수량 조절
-  - QR 결제 페이지 + 영수증 + 결제 완료 화면
+mission_loop.cpp (A) / mission2_loop.cpp (B)
+  - TF map->base_footprint 기반 현재 Pose 계산
+  - topology.yaml 노드 순차 추종 -> /cmd_vel (약 20Hz)
+  - LiDAR /scan 목표 방향 장애물 감지 -> StopAndPlan
+
+  -> local_astar_pure_pursuit.cpp (1차 회피)
+     - Occupancy Grid(/map) + LiDAR 동적 장애물 = Local Planning Grid
+     - 8방향 A* (f = g + h + alignment_penalty, Path Corridor 제한)
+     - Pure Pursuit lookahead 추종 -> Topology 복귀
+
+  -> Corridor Pass 판단 -> MPPI Rescue (2차 회피)
+     - Nav2 FollowPath + MPPI Controller로 Rescue Path 추종
+     - 안전 조건 충족 시 Local / Topology로 제어권 Handoff
 ```
 
-**실행 구조**
+**ArUco 정밀 접근 + 작업 연계 흐름**
 
 ```text
-[Ubuntu PC]
-  - pan_tilt_ros2.py
-  - yolo_detect_ros2.py
-  - ros2_cart_bridge.py
-  - cart_gui.py
-
-[TurtleBot3 + Raspberry Pi 4]
-  - person_follower.cpp
-  - go_to_pose.cpp
-  - servo_udp_bridge.py
-  - scan_summary_monitor.py
-  - TurtleBot3 /scan, /cmd_vel 연동
+Leader Slot 도착
+  -> mission_loop.cpp: /aruco_marker/enable = true
+     -> aruco_marker_detector_node.cpp
+        - 카메라 마커 검출 -> /aruco_marker/target (횡오차, 거리)
+     - target 기반 저속 정밀 접근 -> 정지거리 도달 정지
+     - 터틀봇 180° 제자리 회전 + 7.5cm 후진
+     - A_mission_start -> 매니퓰레이터 작업 시작
+     - 작업 위치 Zero Twist 정지 유지
 ```
+
+**RC카 추종 + GUI-주행 통합(SI) 흐름**
+
+```text
+mission_loop.cpp
+  - /turtlebot/pose 발행 (Leader Pose)
+  - /rc_car/follower_mode (follow / stop / turn_ccw_90 ...)
+
+rc_car_follower_node.cpp   (ROS_DOMAIN_ID=27 도메인 통합)
+  - Leader Pose History 저장 -> 약 0.70m 뒤 Follow Target 선택
+  - /rc_car/odom, /rc_car/slot_wait_status 발행
+  ※ RC카 거리·속도·PWM 튜닝은 팀원 담당
+
+[React GUI] 구역/충전 선택 -> [Go Backend] Mission Runner 프로세스 실행
+  -> [Python ROS2 Bridge] /mission_command, /initialpose 전달 -> 주행 시스템
+  <- 상태 피드백: TF / /odom / /scan -> Bridge -> Backend -> WebSocket -> GUI
+  ※ GUI / Backend / Bridge 개발은 팀원, 주행 로직 연동(SI)은 본인 담당
+```
+
+**Tech Stack** — ROS2 Humble · C++ · Nav2 (FollowPath / NavigateToPose / MPPI) · TF2 · LiDAR · AMCL · ArUco · DDS
 
 ---
 
-### 2. BootCamp Project 1 - Arduino Based ADAS
+### 2. Smart Car ROS2 Project - `smart_car_ws`
+
+ROS2 Humble 기반 스마트 카트 시스템입니다. TurtleBot3, Raspberry Pi 4, Ubuntu PC, ESP32 팬틸트 서보, LiDAR, YOLOv8 Pose, Flask 장바구니 UI를 하나의 워크스페이스에서 연동한 팀 프로젝트입니다.
+
+**담당 역할** — 팬틸트 서보 제어와 C++ 추종 주행(`person_follower.cpp`)·LiDAR 장애물 회피·Nav2 `NavigateToPose` 목적지 이동을 개발하고, 팀원이 구현한 YOLOv8 Pose·BoT-SORT 인식·추적 알고리즘을 가져와 서보 제어·주행 로직과 융합해 하나의 추종 주행 시스템으로 통합
+
+**구성 패키지**
+
+| Package | Language | 담당 | 주요 역할 |
+| --- | --- | --- | --- |
+| `smart_car_cpp_pkg` | C++17 | 본인 | 추적 대상 추종 주행, LiDAR 장애물 회피, Nav2 `NavigateToPose` 목적지 이동 |
+| `smart_car_py_pkg` | Python 3 | 팀원 · 본인 | YOLOv8 Pose·BoT-SORT 추적·상품 인식·Flask 장바구니(팀원) / 팬틸트 서보 제어(본인) |
+
+**팬틸트 서보 제어 (담당)**
+
+팀원이 개발한 인식·추적 노드가 BoT-SORT로 대상 객체를 추적하면, 본인은 그 대상의 화면 내 위치를 받아 팬틸트 서보를 제어합니다. 대상 중심과 화면 중심의 오차를 계산하고 Dead Zone으로 미세 흔들림을 제거한 뒤, 오차에 비례해 Pan 각도를 보정하고 smoothing으로 급격한 움직임을 완화합니다. 0~180°를 500~2500μs로 변환해 `/servo_pan_cmd`로 서보를 구동하고, 현재 Pan 각도를 `/pan_tilt/pan_angle`로 발행해 카메라가 대상을 화면 중앙에 유지하면서 주행 로직에 방향 정보를 제공합니다.
+
+**추종 주행 및 장애물 회피 (담당)**
+
+`person_follower.cpp`는 `/pan_tilt/pan_angle`, `/person_detection`, LiDAR `/scan`을 결합해 `/cmd_vel`을 생성하여 대상 객체를 따라 주행합니다. Pan 각도로 대상 방향을 향해 본체를 정렬(P 제어, `angular.z`)하고 Pan 방향의 LiDAR 거리로 선속도 단계를 제어하며 10Hz로 동작합니다. 상태 머신은 `PERSON_FOLLOW -> AVOID_TURN -> AVOID_FORWARD -> PERSON_FOLLOW` 흐름이며, 전방 ±45° 최소거리 0.40m에서 회피를 트리거하고 좌우 평균 공간을 비교해 넓은 방향으로 회전, 목표 0.65m Wall Following(P 제어) 후 Pan 각도가 정렬되면 추종으로 복귀합니다. 파라미터는 `person_follower.yaml`에서 실행 중 조정할 수 있으며, `go_to_pose.cpp`로 GUI 목적지를 Nav2 `NavigateToPose` 액션으로 자율주행합니다.
+
+**추적 융합 + 추종 주행 데이터 흐름**
+
+```text
+[PC · 팀원] YOLOv8 Pose + BoT-SORT
+  - 대상 객체 추적 -> 대상 화면 위치 / 검출 정보 제공
+
+[PC · 본인] 팬틸트 서보 제어
+  - 대상 화면 위치 오차 -> Dead Zone -> 비례 보정 -> smoothing
+  - 0~180° -> 500~2500μs -> /servo_pan_cmd (카메라가 대상 추종)
+  - /pan_tilt/pan_angle 발행
+
+[Pi4 · 본인] person_follower.cpp
+  - 입력: /pan_tilt/pan_angle + /person_detection + /scan
+  - PERSON_FOLLOW : pan 각도 정렬 + LiDAR 거리 기반 전진 (대상 추종)
+  - AVOID_TURN    : 전방 0.40m 근접 -> 좌우 넓은 쪽 회전
+  - AVOID_FORWARD : 측면 0.65m Wall Following
+  - 복귀          : pan 각도 정렬 시 PERSON_FOLLOW
+  - 출력: /cmd_vel
+
+[본인] go_to_pose.cpp -> Nav2 NavigateToPose 목적지 이동
+```
+
+> 대상 인식·추적 알고리즘(YOLOv8 Pose·BoT-SORT), 상품 인식, Flask 장바구니 UI는 팀원이 개발했으며, 본인은 그 인식 결과를 팬틸트 서보 제어 및 추종 주행과 융합해 통합했습니다.
+
+---
+
+### 3. BootCamp Project 1 - Arduino Based ADAS
 
 Arduino Uno + ESP32 + PyQt5를 묶은 RC카 기반 ADAS 주행 보조 시스템입니다. 모바일 RoboRemoDemo 앱에서 ESP32로 명령을 보내면, ESP32가 UART로 Arduino Uno 모터 컨트롤러에 명령을 전달하고 WiFi UDP로 PyQt5 GUI에 센서 데이터를 스트리밍합니다.
 
@@ -160,7 +212,7 @@ Arduino Uno + ESP32 + PyQt5를 묶은 RC카 기반 ADAS 주행 보조 시스템�
 
 ---
 
-### 3. Hospital Chatbot Project - 건강이
+### 4. Hospital Chatbot Project - 건강이
 
 고령층을 위한 병원 추천 챗봇입니다. 사용자가 자연어로 증상과 지역을 입력하면 한국어 NLP로 증상을 정규화하고, 공공 병원 데이터와 진료과 매칭을 거쳐 인근 병원을 추천합니다.
 
@@ -197,6 +249,7 @@ Arduino Uno + ESP32 + PyQt5를 묶은 RC카 기반 ADAS 주행 보조 시스템�
 
 | Repository | Description |
 | --- | --- |
+| [HanSuChang/Topology_Graph_test](https://github.com/HanSuChang/Topology_Graph_test) | 매니퓰레이터 탑재 TurtleBot AMR + 추종 RC카 물류 이송 시스템 |
 | [Mignonbrothers/smart_car_ws](https://github.com/Mignonbrothers/smart_car_ws) | TurtleBot3 + YOLOv8 Pose + LiDAR 기반 스마트 카트 |
 | [Daejeon-2025-Weather-Data-Analysis](https://github.com/HanSuChang/Daejeon-2025-Weather-Data-Analysis) | 대전 지역 2025년 날씨 데이터 분석 |
 | [pygame-SPACE-DASH-GAME](https://github.com/HanSuChang/pygame-SPACE-DASH-GAME) | Python Pygame 기반 우주 회피 게임 |
@@ -208,9 +261,10 @@ Arduino Uno + ESP32 + PyQt5를 묶은 RC카 기반 ADAS 주행 보조 시스템�
 ## What I Focus On
 
 - 실제 장비에서 동작하는 ROS2 노드 설계
-- 센서 데이터와 제어 로직을 연결하는 시스템 구성
+- Topology 기반 미션 주행과 계층형(Local A* / MPPI) 장애물 회피 설계
+- 인식 결과를 서보·주행 제어와 융합하는 시스템 통합
 - Python/C++을 함께 사용하는 분산 로봇 소프트웨어 개발
-- 컴퓨터 비전 기반 인식 기능 구현
+- 센서 데이터와 제어 로직을 연결하는 시스템 구성
 - 사용자가 조작하기 쉬운 GUI와 로봇 상태 시각화
 
 ## Development Environment
